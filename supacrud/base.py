@@ -1,9 +1,11 @@
 # Path: supacrud/base.py
 import requests
 import logging
-from typing import Dict, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from tenacity import retry, stop_after_attempt, wait_exponential
 from urllib.parse import urljoin
+
+ResponseType = Union[Dict[str, Any], List[Dict[str, Any]]]
 
 logger = logging.getLogger(__name__)
 
@@ -14,66 +16,69 @@ class SupabaseError(Exception):
         self.status_code = status_code
         self.url = url
 
-class Supabase:
-    """A Python client for interacting with a Supabase database."""
-    def __init__(self, base_url: str, service_role_key: str):
-        """Initialize the client with the base URL and service role key."""
-        self.base_url = base_url
-        self.headers = {
-            'apikey': service_role_key,
-            'Content-Type': 'application/json'
-        }
+class BaseRequester:
+    """Base class for making HTTP requests."""
+
+    def __init__(self, base_url: str, headers: Dict[str, str]):
+        """Initialize the requester with a base URL and headers."""
+        self.base_url = base_url if base_url.endswith('/') else base_url + '/'
+        self.headers = headers
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=6))
-    def _perform_request(self, method: str, url: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def perform_request(self, method: str, path: str, data: Optional[Dict[str, Any]] = None) -> ResponseType:
         """Perform an HTTP request and handle any exceptions."""
         response = None
+        full_url = self.base_url.rstrip('/') + '/' + path.lstrip('/')
         try:
-            response = requests.request(method, url, headers=self.headers, json=data)
+            response =  requests.request(method, full_url, headers=self.headers, json=data)
             response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as err:
+        except requests.exceptions.HTTPError as err:
             logger.error(f'Request failed: {err}')
-            status_code = response.status_code if response is not None else None
-            raise SupabaseError('Supabase request failed', status_code) from err
+            error_message = 'Supabase request failed'
+            if response is not None:
+                error_message = response.json().get('message', error_message)
+            raise SupabaseError(error_message, err.response.status_code, full_url) from err
+        return response.json()
 
-    def create(self, table: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a record in the specified table."""
-        logger.debug(f'Creating record in {table} table')
-        return self._perform_request('POST', f'{table}', data=data)
 
-    def _validate_id(self, id: str):
-        """Validate the provided id."""
-        if not id:
-            raise ValueError("An ID is required.")
-        # Further validation logic for id could be added here.
+class Supabase(BaseRequester):
+    """A Python client for interacting with a Supabase database."""
 
-    def _get_url(self, table: str, id: Optional[str] = None) -> str:
-        """Create a url for a given table and optional id."""
-        url = urljoin(self.base_url, table)
-        if id is not None:
-            self._validate_id(id)
-            url += f'?id=eq.{id}'
-        return url
+    def __init__(self, base_url: str, service_role_key: str, anon_key: str):
+        """Initialize the client with the base URL, service role key, and anon key."""
+        headers = {
+            'apikey': anon_key,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+            'Authorization': f'Bearer {service_role_key}'
+        }
+        super().__init__(base_url, headers)
 
-    def read(self, table: str, id: Optional[str] = None, filters: Optional[str] = None) -> Dict[str, Any]:
-        """Read records from the specified table, with optional filters."""
-        if id is None and filters is None:
-            raise ValueError("Either 'id' or 'filters' must be provided.")
-        logger.debug(f'Reading records from {table} table')
-        url = self._get_url(table, id)
-        if filters is not None:
-            url += f'&{filters}' if '?' in url else f'?{filters}'
-        return self._perform_request('GET', url)
+    def update_headers(self, headers: Dict[str, str]):
+        """Update the headers used for requests."""
+        self.headers.update(headers)
 
-    def update(self, table: str, id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update a record in the specified table."""
-        logger.debug(f'Updating record in {table} table')
-        url = self._get_url(table, id)
-        return self._perform_request('PATCH', url, data=data)
+    def create(self, url: str, data: Dict[str, Any]) -> ResponseType:
+        """Create a record at the specified URL."""
+        logger.debug(f'Performing POST operation at {url}')
+        return self.perform_request('POST', url, data=data)
 
-    def delete(self, table: str, id: str) -> Dict[str, Any]:
-        """Delete a record from the specified table."""
-        logger.debug(f'Deleting record from {table} table')
-        url = self._get_url(table, id)
-        return self._perform_request('DELETE', url)
+    def read(self, url: str) -> ResponseType:
+        """Read records from the specified URL."""
+        logger.debug(f'Performing GET operation at {url}')
+        return self.perform_request('GET', url)
+
+    def update(self, url: str, data: Dict[str, Any]) -> ResponseType:
+        """Update records at the specified URL."""
+        logger.debug(f'Performing PATCH operation at {url}')
+        return self.perform_request('PATCH', url, data=data)
+
+    def delete(self, url: str) -> ResponseType:
+        """Delete records at the specified URL."""
+        logger.debug(f'Performing DELETE operation at {url}')
+        return self.perform_request('DELETE', url)
+    
+    def rpc(self, url: str, params: Optional[Dict[str, Any]] = None) -> ResponseType:
+        """Perform a POST request at the specified URL."""
+        logger.debug(f'Performing RPC operation at {url}')
+        return self.perform_request('POST', url, data=params)
