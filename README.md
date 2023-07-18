@@ -34,6 +34,32 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Installing `supacrud` in a Production Environment
+
+This guide shows how to install the `supacrud` Python package from a private GitHub repository in a production environment such as a cloud function or a Fargate task.
+
+### Prerequisites
+
+- You should have a GitHub personal access token with the `repo` scope. You can generate this token from your GitHub account settings.
+
+### Instructions
+
+1. **Set Environment Variables**
+
+   You need to set the following environment variables:
+   - `GITHUB_TOKEN`: Your GitHub personal access token.
+   - `GITHUB_OWNER`: The username of the owner of the repository.
+   - `GITHUB_REPO`: The name of the repository.
+
+   The process to set these variables depends on your specific cloud environment. Check your cloud provider's documentation for instructions on setting environment variables.
+
+2. **Install the `supacrud` Package**
+
+   Once the environment variables are set, you can use them in the pip install command:
+
+   ```bash
+   pip install git+https://${GITHUB_TOKEN}:x-oauth-basic@github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git
+    ```
 ## Usage
 
 Using SupaCRUD is straightforward. Here's a quick example demonstrating a CREATE operation on a Supabase table:
