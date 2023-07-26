@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-# supacrud
-SupaCRUD is a Python library that provides a comprehensive interface to interact with Supabase, a full-stack Backend-as-a-Service platform.
-=======
 # SupaCRUD
 
 SupaCRUD is a Python library that provides a comprehensive interface to interact with Supabase, a full-stack Backend-as-a-Service platform. With SupaCRUD, you can seamlessly perform Create, Read, Update, and Delete (CRUD) operations on your Supabase tables. In addition, SupaCRUD provides a robust interface to invoke remote procedure calls (RPCs) on your database.
@@ -82,4 +78,3 @@ We welcome contributions to SupaCRUD! If you're interested in contributing, plea
 
 
 
->>>>>>> 6e0b42a (Initial commit: Basic project setup)

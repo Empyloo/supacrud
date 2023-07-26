@@ -5,3 +5,8 @@ test:
 	else \
 		pytest tests/$$file --cov=supacrud; \
 	fi
+
+PHONY: install
+install:
+	pip install --upgrade pip
+	pip install -r requirements.txt

@@ -2,6 +2,7 @@
 import sys
 import os
 
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import logging
@@ -12,6 +13,7 @@ import socket
 import yaml
 
 from supabase_e2e_methods import main_test
+from docker_check import check_docker_running
 from create_table_and_function import create_table_and_function
 
 logging.basicConfig(level=logging.INFO)
@@ -133,6 +135,7 @@ async def get_supabase_status() -> str:
 
 
 async def get_supabase_credentials() -> str:
+    check_docker_running()
     try:
         if not os.path.isdir("supabase"):
             logger.error("Supabase directory does not exist, creating...")
