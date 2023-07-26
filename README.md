@@ -76,6 +76,3 @@ client.create("your_table", {"column1": "value1", "column2": "value2"})
 We welcome contributions to SupaCRUD! If you're interested in contributing, please take a look at our contribution guidelines.
 
 ## License
-
-
-

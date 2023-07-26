@@ -173,7 +173,7 @@ async def get_supabase_credentials() -> str:
             type(error).__name__,
             error.args,
         )
-        # await stop_supabase()
+        await stop_supabase()
         raise
 
 
