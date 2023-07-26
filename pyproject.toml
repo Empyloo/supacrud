@@ -2,7 +2,7 @@
 name = "supacrud"
 version = "0.1.0"
 description = "A Python library for CRUD operations on Supabase."
-authors = ["Empyloo admin@empylo.com"]
+authors = ["Empyloo <admin@empylo.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
