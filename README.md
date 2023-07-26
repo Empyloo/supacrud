@@ -9,6 +9,7 @@ The project follows a structured layout with isolated modules for each database 
 - `supacrud/`: Core package containing the implementation of CRUD operations and RPC invocations.
 - `tests/`: Contains unit tests to verify the functionality of the SupaCRUD package.
 - `docs/`: In-depth documentation about using the SupaCRUD package.
+- `scripts/`: Contains scripts to automate end-to-end testing of the SupaCRUD package.
 - `setup.cfg`: Configuration file for setuptools.
 - `pyproject.toml`: Specifies build system requirements and constraints.
 - `README.md`: This file, providing an overview of the project.
@@ -18,7 +19,7 @@ The project follows a structured layout with isolated modules for each database 
 To get started with SupaCRUD, clone the repository and navigate into the cloned directory:
 
 ```bash
-git clone https://github.com/yourusername/supacrud.git
+git clone https://github.com/Empyloo/supacrud.git
 cd supacrud
 ```
 
@@ -29,32 +30,32 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
+## Running Tests
+
+To run the unit tests, use the following command:
+
+```bash
+make test
+```
+
+To run the end-to-end tests, use the following command:
+
+```bash
+make e2e
+```
 
 ## Installing `supacrud` in a Production Environment
 
-This guide shows how to install the `supacrud` Python package from a private GitHub repository in a production environment such as a cloud function or a Fargate task.
-
-### Prerequisites
-
-- You should have a GitHub personal access token with the `repo` scope. You can generate this token from your GitHub account settings.
+This guide shows how to install the `supacrud` Python package from a GitHub repository.
 
 ### Instructions
 
-1. **Set Environment Variables**
+1. **Install the `supacrud` Package**
 
-   You need to set the following environment variables:
-   - `GITHUB_TOKEN`: Your GitHub personal access token.
-   - `GITHUB_OWNER`: The username of the owner of the repository.
-   - `GITHUB_REPO`: The name of the repository.
-
-   The process to set these variables depends on your specific cloud environment. Check your cloud provider's documentation for instructions on setting environment variables.
-
-2. **Install the `supacrud` Package**
-
-   Once the environment variables are set, you can use them in the pip install command:
+   pip install command:
 
    ```bash
-   pip install git+https://${GITHUB_TOKEN}:x-oauth-basic@github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git
+   pip install git+https://github.com/Empyloo/supacrud.git
     ```
 ## Usage
 

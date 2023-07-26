@@ -1,3 +1,4 @@
+PHONY: test install
 test:
 	@echo "Running tests..."
 	@if [ -z "$$file" ]; then \
@@ -6,7 +7,9 @@ test:
 		pytest tests/$$file --cov=supacrud; \
 	fi
 
-PHONY: install
 install:
 	pip install --upgrade pip
 	pip install -r requirements.txt
+
+e2e:
+	python scripts/local_supabase_runner.py
