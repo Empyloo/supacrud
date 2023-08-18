@@ -164,6 +164,7 @@ async def get_supabase_credentials() -> str:
         test_result = main_test(credentials)
         if not test_result:
             raise RuntimeError("Supabase CRUD operations failed.")
+        await stop_supabase()
         return json.dumps(credentials)
 
     except Exception as error:
