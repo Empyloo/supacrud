@@ -8,6 +8,7 @@ authors = ["Empyloo <admin@empylo.com>"]
 python = "^3.10"
 requests = "^2.26"
 tenacity = "^8.0.1"
+certifi = ">=2023.7.22"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
