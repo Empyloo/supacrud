@@ -29,8 +29,8 @@ def test_supacrud_create(db: Supabase) -> None:
     # Create operation
     user = {"author_name": NAME, "author_email": EMAIL, "author_age": AGE, "story_name": STORY}
     logger.info("Creating a story: %s", user)
-    db.create("rest/v1/stories", user)
-    logger.info("Story created: %s", user)
+    created_user = db.create("rest/v1/stories", user)
+    logger.info("** Story created **: %s", created_user)
 
 
 def test_supacrud_read(db: Supabase) -> str:

@@ -12,4 +12,4 @@ install:
 	pip install -r requirements.txt
 
 e2e:
-	python scripts/local_supabase_runner.py8818-439B
+	python scripts/local_supabase_runner.py
