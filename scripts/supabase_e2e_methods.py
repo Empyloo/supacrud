@@ -1,6 +1,10 @@
 # Path: scripts/local_supabase_e2e.py
 import logging
+import os
+import yaml
+import sys
 
+sys.path.append("..")
 from supacrud import Supabase
 
 logger = logging.getLogger(__name__)
@@ -10,6 +14,7 @@ EMAIL = "john.doe@example.com"
 STORY = "The Tale of John Doe"
 AGE = 32
 STORY_NAME_EDITED = "The Tale of Jane Doe And His Past."
+
 
 def setup_supacrud(credentials: dict) -> Supabase:
     try:
@@ -27,7 +32,12 @@ def setup_supacrud(credentials: dict) -> Supabase:
 
 def test_supacrud_create(db: Supabase) -> None:
     # Create operation
-    user = {"author_name": NAME, "author_email": EMAIL, "author_age": AGE, "story_name": STORY}
+    user = {
+        "author_name": NAME,
+        "author_email": EMAIL,
+        "author_age": AGE,
+        "story_name": STORY,
+    }
     logger.info("Creating a story: %s", user)
     created_user = db.create("rest/v1/stories", user)
     logger.info("** Story created **: %s", created_user)
@@ -38,12 +48,17 @@ def test_supacrud_read(db: Supabase) -> str:
     logger.info("Reading story with email: %s", EMAIL)
     stories = db.read("rest/v1/stories")
     logger.info("Read stories: %s", stories)
-    return stories[0]["id"] 
+    return stories[0]["id"]
 
 
 def test_supacrud_update(db: Supabase) -> None:
     # Update operation
-    story = {"author_name": NAME, "author_email": EMAIL, "author_age":  AGE, "story_name": STORY_NAME_EDITED}
+    story = {
+        "author_name": NAME,
+        "author_email": EMAIL,
+        "author_age": AGE,
+        "story_name": STORY_NAME_EDITED,
+    }
     id = test_supacrud_read(db)
     logger.info("Updating story: %s", story)
     db.update(f"rest/v1/stories?id=eq.{id}", story)
@@ -76,3 +91,18 @@ def main_test(credentials: dict) -> bool:
     except Exception as e:
         logger.error("Error running Supabase CRUD operations: %s", e)
         return False
+
+
+def main() -> None:
+    logger.info("Running Supabase E2E tests")
+    with open(os.path.join("config", "e2e_test_config.yml"), "r") as f:
+        credentials = yaml.safe_load(f)
+    main_test(credentials)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+    )
+    main()

@@ -1,40 +1,50 @@
+import logging
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import text
 
+logger = logging.getLogger(__name__)
+
+
 def create_table_and_function(db_uri: str) -> None:
+    """Create a table and function in the database.
+
+    Args:
+        db_uri (str): The URI of the database.
+    """
     try:
         engine = create_engine(db_uri)
         metadata = MetaData()
 
-
         # Define the table
         stories = Table(
-            'stories',
+            "stories",
             metadata,
-            Column('id', Integer, primary_key=True, autoincrement=True),
-            Column('author_name', Text, nullable=True),
-            Column('author_email', Text, nullable=True),
-            Column('author_age', Integer, nullable=True),
-            Column('story_name', Text, nullable=True),
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("author_name", Text, nullable=True),
+            Column("author_email", Text, nullable=True),
+            Column("author_age", Integer, nullable=True),
+            Column("story_name", Text, nullable=True),
         )
 
         # Create the table
         metadata.create_all(engine)
 
         # Define the function
-        get_user_by_email_func = text("""
+        get_user_by_email_func = text(
+            """
             CREATE OR REPLACE FUNCTION get_story_by_email(author_email_param text)
             RETURNS SETOF stories AS $$
             BEGIN
                 RETURN QUERY SELECT * FROM stories WHERE stories.author_email = author_email_param;
             END $$ LANGUAGE plpgsql;
 
-        """)
+        """
+        )
 
         # Create the function
         with engine.begin() as connection:
             connection.execute(get_user_by_email_func)
-
+            logger.info("Created table and function")
     except Exception as e:
         raise

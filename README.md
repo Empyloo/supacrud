@@ -41,6 +41,7 @@ make test
 To run the end-to-end tests, use the following command:
 
 ```bash
+pip install .
 make e2e
 ```
 
@@ -69,6 +70,16 @@ client = Supabase("your_supabase_url", "your_supabase_key")
 
 # Perform a CREATE operation
 client.create("your_table", {"column1": "value1", "column2": "value2"})
+```
+## Bumping Version
+
+To bump the version of the package with poetry, use the following command:
+
+```bash
+poetry version <1.2.3>
+poetry version patch  # 0.1.0 -> 0.1.1
+poetry version minor  # 0.1.0 -> 0.2.0
+poetry version major  # 0.1.0 -> 1.0.0
 ```
 
 ## Contributing

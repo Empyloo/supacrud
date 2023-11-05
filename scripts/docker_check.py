@@ -1,5 +1,6 @@
 import subprocess
 
+
 def check_docker_running():
     """Check if Docker is running.
     Returns:

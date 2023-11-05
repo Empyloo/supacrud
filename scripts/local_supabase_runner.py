@@ -76,6 +76,36 @@ async def run_supabase_command(command: str, flags: list = []) -> str:
     return stdout.decode()
 
 
+async def run_test_methods_file() -> bool:
+    try:
+        """Run the test methods from `python scripts/supabase_e2e_methods.py`"""
+        process = await asyncio.create_subprocess_exec(
+            "python",
+            "scripts/supabase_e2e_methods.py",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        stdout, stderr = await process.communicate()
+
+        if stdout:
+            logger.info(stdout.decode())
+        if stderr:
+            logger.error(stderr.decode())
+
+        if process.returncode != 0:
+            raise SupabaseCommandError(
+                f"Error running test methods file. Return code: {process.returncode}"
+            )
+        return True
+
+    except Exception as error:
+        logger.error(
+            f"An error of type {type(error).__name__} occurred. Arguments:\n{error.args}"
+        )
+        raise
+
+
 async def write_e2e_test_config_file(credentials: dict) -> bool:
     if not credentials:
         logger.error("No credentials provided to write to the e2e_test_config.yml file")
@@ -161,7 +191,7 @@ async def get_supabase_credentials() -> str:
         create_table_and_function(credentials["supabase_db_url"])
 
         logger.info("DB credentials: %s", credentials)
-        test_result = main_test(credentials)
+        test_result = await run_test_methods_file()  # main_test(credentials)
         if not test_result:
             raise RuntimeError("Supabase CRUD operations failed.")
         await stop_supabase()
