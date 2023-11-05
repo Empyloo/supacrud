@@ -92,10 +92,10 @@ class Supabase(BaseRequester):
         anon_key (str): The anonymous key for the Supabase API.
 
     Methods:
-        create: Create a record at the specified URL.
-        read: Read records from the specified URL.
-        update: Update records at the specified URL.
-        delete: Delete records at the specified URL.
+        create: Create a record at the specified URL, POST request.
+        read: Read records from the specified URL, GET request.
+        update: Update records at the specified URL, PATCH request.
+        delete: Delete records at the specified URL, DELETE request.
         rpc: Perform a POST request at the specified URL.
 
     Examples:
@@ -129,7 +129,7 @@ class Supabase(BaseRequester):
         super().__init__(base_url, headers)
 
     def update_headers(self, headers: Dict[str, str]):
-        """Update the headers used for requests.
+        """Update the headers used for requests, UPDATE request.
 
         Args:
             headers (Dict[str, str]): The new headers to add or existing headers to update.
@@ -137,7 +137,7 @@ class Supabase(BaseRequester):
         self.headers.update(headers)
 
     def create(self, url: str, data: Dict[str, Any]) -> ResponseType:
-        """Create a record at the specified URL.
+        """Create a record at the specified URL, POST request.
 
         Args:
             url (str): The URL to create the record at.
@@ -150,7 +150,7 @@ class Supabase(BaseRequester):
         return self.execute("POST", url, data=data)
 
     def read(self, url: str) -> ResponseType:
-        """Read records from the specified URL.
+        """Read records from the specified URL, GET request.
 
         Args:
             url (str): The URL to read records from.
@@ -162,7 +162,7 @@ class Supabase(BaseRequester):
         return self.execute("GET", url)
 
     def update(self, url: str, data: Dict[str, Any]) -> ResponseType:
-        """Update records at the specified URL.
+        """Update records at the specified URL, PATCH request.
 
         Args:
             url (str): The URL to update records at.
@@ -175,7 +175,7 @@ class Supabase(BaseRequester):
         return self.execute("PATCH", url, data=data)
 
     def delete(self, url: str) -> ResponseType:
-        """Delete records at the specified URL.
+        """Delete records at the specified URL, DELETE request.
 
         Args:
             url (str): The URL to delete records at.
