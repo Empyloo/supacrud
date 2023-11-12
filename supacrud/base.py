@@ -108,7 +108,7 @@ class BaseRequester:
             )
             def request_with_retry() -> requests.Response:
                 response = self.session.request(
-                    method, url, json=data, headers=self.headers
+                    method, url, data=data, headers=self.headers
                 )
                 response.raise_for_status()
                 return response
