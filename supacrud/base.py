@@ -116,9 +116,9 @@ class BaseRequester:
             try:
                 return request_with_retry()
             except requests.exceptions.HTTPError as e:
-                logger.error(f"HTTP request failed: {e}")
                 raise SupabaseError(
-                    f"HTTP request failed: {e}",
+                    "HTTP request failed: %s for method %s headers %s and data %s"
+                    % (e, method, self.headers, data),
                     status_code=e.response.status_code,
                     url=url,
                 )
