@@ -123,11 +123,20 @@ class BaseRequester:
                     url=url,
                 )
         else:
-            response = self.session.request(
-                method, url, json=data, headers=self.headers
-            )
-            response.raise_for_status()
-            return response
+            try:
+                response = self.session.request(
+                    method, url, json=data, headers=self.headers
+                )
+                response.raise_for_status()
+                return response
+            except requests.exceptions.HTTPError as e:
+                raise SupabaseError(
+                    "HTTP request failed: %s for method %s headers %s and data %s"
+                    % (e, method, self.headers, data),
+                    status_code=e.response.status_code,
+                    url=url,
+                )
+
 
 
 class Supabase(BaseRequester):
