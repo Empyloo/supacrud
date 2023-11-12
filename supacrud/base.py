@@ -18,7 +18,7 @@ class SupabaseError(Exception):
     ):
         """
         Initializes the SupabaseError instance.
-    
+
         Args:
             message (str): The message to be associated with the instance.
             status_code (Optional[int], optional): The status code to be associated with the instance. Defaults to None.
@@ -39,7 +39,16 @@ class BaseRequester:
         backoff_factor: float = 2.0,
         override_non_retriable_status_codes: bool = False,
         add_non_retriable_status_codes: Optional[List[int]] = None,
-        default_non_retriable_status_codes: List[int] = [401, 403, 404, 405, 406, 409, 410, 422],
+        default_non_retriable_status_codes: List[int] = [
+            401,
+            403,
+            404,
+            405,
+            406,
+            409,
+            410,
+            422,
+        ],
     ):
         """
         Initializes the BaseRequester instance.
@@ -47,12 +56,16 @@ class BaseRequester:
         Args:
             base_url (str): The base URL for the API.
             headers (Dict[str, str]): Headers to include in the API request.
+                To override the default headers, use the update_headers method.
             retry (bool, optional): Whether to retry the request if it fails. Defaults to True.
             max_retries (int, optional): Maximum number of retries for the request. Defaults to 3.
             backoff_factor (float, optional): The factor to use for backoff between retries. Defaults to 2.0.
-            override_non_retriable_status_codes (bool, optional): Whether to override the default non-retriable status codes. Defaults to False.
-            add_non_retriable_status_codes (Optional[List[int]], optional): Additional status codes to consider as non-retriable. Defaults to None.
-            default_non_retriable_status_codes (List[int], optional): Default status codes to consider as non-retriable. Defaults to [401, 403, 404, 405, 406, 409, 410, 422].
+            override_non_retriable_status_codes (bool, optional): Whether to
+                override the default non-retriable status codes. Defaults to False.
+            add_non_retriable_status_codes (Optional[List[int]], optional): Additional
+                status codes to consider as non-retriable. Defaults to None.
+            default_non_retriable_status_codes (List[int], optional): Default
+                status codes to consider as non-retriable. Defaults to [401, 403, 404, 405, 406, 409, 410, 422].
         """
         self.base_url = base_url if base_url.endswith("/") else base_url + "/"
         self.headers = headers
@@ -63,43 +76,58 @@ class BaseRequester:
         if override_non_retriable_status_codes:
             self.non_retriable_status_codes = add_non_retriable_status_codes or []
         else:
-            self.non_retriable_status_codes = list(set(default_non_retriable_status_codes + (add_non_retriable_status_codes or [])))
+            self.non_retriable_status_codes = list(
+                set(
+                    default_non_retriable_status_codes
+                    + (add_non_retriable_status_codes or [])
+                )
+            )
 
         self.session = requests.Session()
 
     def execute(
-            self, method: str, path: str, data: Optional[Dict[str, Any]] = None
-        ) -> requests.Response:
-            """
-            Executes an HTTP request with the given method, path, and data.
+        self, method: str, path: str, data: Optional[Dict[str, Any]] = None
+    ) -> requests.Response:
+        """
+        Executes an HTTP request with the given method, path, and data.
 
-            Args:
-                method (str): The HTTP method to use for the request.
-                path (str): The path to send the request to.
-                data (Optional[Dict[str, Any]], optional): The data to send with the request. Defaults to None.
+        Args:
+            method (str): The HTTP method to use for the request.
+            path (str): The path to send the request to.
+            data (Optional[Dict[str, Any]], optional): The data to send with the request. Defaults to None.
 
-            Returns:
-                requests.Response: The response from the HTTP request.
-            """
-            url = urljoin(self.base_url, path)
+        Returns:
+            requests.Response: The response from the HTTP request.
+        """
+        url = urljoin(self.base_url, path)
 
-            if self.retry_enabled:
-                @retry(self.max_retries, self.backoff_factor, self.non_retriable_status_codes)
-                def request_with_retry() -> requests.Response:
-                    response = self.session.request(method, url, json=data, headers=self.headers)
-                    response.raise_for_status()
-                    return response
+        if self.retry_enabled:
 
-                try:
-                    return request_with_retry()
-                except requests.exceptions.HTTPError as e:
-                    raise SupabaseError(
-                        f"HTTP request failed: {e}", status_code=e.response.status_code, url=url
-                    )
-            else:
-                response = self.session.request(method, url, json=data, headers=self.headers)
+            @retry(
+                self.max_retries, self.backoff_factor, self.non_retriable_status_codes
+            )
+            def request_with_retry() -> requests.Response:
+                response = self.session.request(
+                    method, url, json=data, headers=self.headers
+                )
                 response.raise_for_status()
                 return response
+
+            try:
+                return request_with_retry()
+            except requests.exceptions.HTTPError as e:
+                logger.error(f"HTTP request failed: {e}")
+                raise SupabaseError(
+                    f"HTTP request failed: {e}",
+                    status_code=e.response.status_code,
+                    url=url,
+                )
+        else:
+            response = self.session.request(
+                method, url, json=data, headers=self.headers
+            )
+            response.raise_for_status()
+            return response
 
 
 class Supabase(BaseRequester):
@@ -131,13 +159,39 @@ class Supabase(BaseRequester):
         {"id": 1, "name": "John Doe"}
     """
 
-    def __init__(self, base_url: str, service_role_key: str, anon_key: str):
+    def __init__(
+        self,
+        base_url: str,
+        service_role_key: str,
+        anon_key: str,
+        retry: bool = True,
+        max_retries: int = 3,
+        backoff_factor: float = 2.0,
+        override_non_retriable_status_codes: bool = False,
+        add_non_retriable_status_codes: Optional[List[int]] = None,
+        default_non_retriable_status_codes: List[int] = [
+            401,
+            403,
+            404,
+            405,
+            406,
+            409,
+            410,
+            422,
+        ],
+    ):
         """Initialize the client with the base URL, service role key, and anon key.
 
         Args:
             base_url (str): The base URL of the Supabase API.
             service_role_key (str): The service role key for the Supabase API.
             anon_key (str): The anonymous key for the Supabase API.
+            retry (bool, optional): Whether to retry the request if it fails. Defaults to True.
+            max_retries (int, optional): Maximum number of retries for the request. Defaults to 3.
+            backoff_factor (float, optional): The factor to use for backoff between retries. Defaults to 2.0.
+            override_non_retriable_status_codes (bool, optional): Whether to override the default non-retriable status codes. Defaults to False.
+            add_non_retriable_status_codes (Optional[List[int]], optional): Additional status codes to consider as non-retriable. Defaults to None.
+            default_non_retriable_status_codes (List[int], optional): Default status codes to consider as non-retriable. Defaults to [401, 403, 404, 405, 406, 409, 410, 422].
         """
         headers = {
             "apikey": anon_key,
@@ -145,7 +199,16 @@ class Supabase(BaseRequester):
             "Prefer": "return=representation",
             "Authorization": f"Bearer {service_role_key}",
         }
-        super().__init__(base_url, headers)
+        super().__init__(
+            base_url=base_url,
+            headers=headers,
+            retry=retry,
+            max_retries=max_retries,
+            backoff_factor=backoff_factor,
+            override_non_retriable_status_codes=override_non_retriable_status_codes,
+            add_non_retriable_status_codes=add_non_retriable_status_codes,
+            default_non_retriable_status_codes=default_non_retriable_status_codes,
+        )
 
     def update_headers(self, headers: Dict[str, str]):
         """Update the headers used for requests, UPDATE request.
