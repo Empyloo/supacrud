@@ -38,10 +38,10 @@ To run the unit tests, use the following command:
 make test
 ```
 
-To run the end-to-end tests, use the following command:
+To run the end-to-end tests, use the following commands:
 
 ```bash
-pip install .
+pip install . # Install or upgrade the supacrud package
 make e2e
 ```
 

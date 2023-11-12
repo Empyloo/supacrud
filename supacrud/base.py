@@ -1,13 +1,9 @@
 import requests
 import logging
 from typing import Dict, List, Optional, Any, Union
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 from urllib.parse import urljoin
+
+from supacrud.retry import retry
 
 ResponseType = Union[Dict[str, Any], List[Dict[str, Any]]]
 
@@ -20,67 +16,90 @@ class SupabaseError(Exception):
     def __init__(
         self, message: str, status_code: Optional[int] = None, url: Optional[str] = None
     ):
+        """
+        Initializes the SupabaseError instance.
+    
+        Args:
+            message (str): The message to be associated with the instance.
+            status_code (Optional[int], optional): The status code to be associated with the instance. Defaults to None.
+            url (Optional[str], optional): The URL to be associated with the instance. Defaults to None.
+        """
         super().__init__(message)
         self.status_code = status_code
         self.url = url
 
 
 class BaseRequester:
-    """Base class for making HTTP requests."""
-
-    def __init__(self, base_url: str, headers: Dict[str, str]):
-        """Initialize the requester with a base URL and headers.
+    def __init__(
+        self,
+        base_url: str,
+        headers: Dict[str, str],
+        retry: bool = True,
+        max_retries: int = 3,
+        backoff_factor: float = 2.0,
+        override_non_retriable_status_codes: bool = False,
+        add_non_retriable_status_codes: Optional[List[int]] = None,
+        default_non_retriable_status_codes: List[int] = [401, 403, 404, 405, 406, 409, 410, 422],
+    ):
+        """
+        Initializes the BaseRequester instance.
 
         Args:
-            base_url (str): The base URL of the Supabase API.
-            headers (Dict[str, str]): The headers to use for requests.
-
-        Raises:
-            ValueError: If the base URL does not end with a forward slash.
+            base_url (str): The base URL for the API.
+            headers (Dict[str, str]): Headers to include in the API request.
+            retry (bool, optional): Whether to retry the request if it fails. Defaults to True.
+            max_retries (int, optional): Maximum number of retries for the request. Defaults to 3.
+            backoff_factor (float, optional): The factor to use for backoff between retries. Defaults to 2.0.
+            override_non_retriable_status_codes (bool, optional): Whether to override the default non-retriable status codes. Defaults to False.
+            add_non_retriable_status_codes (Optional[List[int]], optional): Additional status codes to consider as non-retriable. Defaults to None.
+            default_non_retriable_status_codes (List[int], optional): Default status codes to consider as non-retriable. Defaults to [401, 403, 404, 405, 406, 409, 410, 422].
         """
         self.base_url = base_url if base_url.endswith("/") else base_url + "/"
         self.headers = headers
+        self.retry_enabled = retry
+        self.max_retries = max_retries
+        self.backoff_factor = backoff_factor
+
+        if override_non_retriable_status_codes:
+            self.non_retriable_status_codes = add_non_retriable_status_codes or []
+        else:
+            self.non_retriable_status_codes = list(set(default_non_retriable_status_codes + (add_non_retriable_status_codes or [])))
+
         self.session = requests.Session()
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=6),
-        retry=retry_if_exception_type((requests.exceptions.RequestException,)),
-    )
     def execute(
-        self, method: str, path: str, data: Optional[Dict[str, Any]] = None
-    ) -> ResponseType:
-        """Perform an HTTP request and handle any exceptions.
+            self, method: str, path: str, data: Optional[Dict[str, Any]] = None
+        ) -> requests.Response:
+            """
+            Executes an HTTP request with the given method, path, and data.
 
-        Args:
-            method (str): The HTTP method to use.
-            path (str): The path to perform the request at.
-            data (Optional[Dict[str, Any]], optional): The data to send with the request. Defaults to None.
+            Args:
+                method (str): The HTTP method to use for the request.
+                path (str): The path to send the request to.
+                data (Optional[Dict[str, Any]], optional): The data to send with the request. Defaults to None.
 
-        Raises:
-            SupabaseError: If the request fails.
+            Returns:
+                requests.Response: The response from the HTTP request.
+            """
+            url = urljoin(self.base_url, path)
 
-        Returns:
-            ResponseType: The response from the Supabase API.
-        """
-        response = None
-        full_url = urljoin(self.base_url, path)
-        try:
-            response = self.session.request(
-                method, full_url, headers=self.headers, json=data
-            )
-            response.raise_for_status()
-        except requests.exceptions.RequestException as err:
-            logger.error(f"Request failed: {err}")
-            error_message = "Supabase request failed"
-            if response is not None:
-                error_message = response.json().get("message", error_message)
-            raise SupabaseError(
-                error_message,
-                err.response.status_code if err.response else None,
-                full_url,
-            ) from err
-        return response.json()
+            if self.retry_enabled:
+                @retry(self.max_retries, self.backoff_factor, self.non_retriable_status_codes)
+                def request_with_retry() -> requests.Response:
+                    response = self.session.request(method, url, json=data, headers=self.headers)
+                    response.raise_for_status()
+                    return response
+
+                try:
+                    return request_with_retry()
+                except requests.exceptions.HTTPError as e:
+                    raise SupabaseError(
+                        f"HTTP request failed: {e}", status_code=e.response.status_code, url=url
+                    )
+            else:
+                response = self.session.request(method, url, json=data, headers=self.headers)
+                response.raise_for_status()
+                return response
 
 
 class Supabase(BaseRequester):
@@ -147,7 +166,7 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing POST operation at {url}")
-        return self.execute("POST", url, data=data)
+        return self.execute("POST", url, data=data).json()
 
     def read(self, url: str) -> ResponseType:
         """Read records from the specified URL, GET request.
@@ -159,7 +178,7 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing GET operation at {url}")
-        return self.execute("GET", url)
+        return self.execute("GET", url).json()
 
     def update(self, url: str, data: Dict[str, Any]) -> ResponseType:
         """Update records at the specified URL, PATCH request.
@@ -172,7 +191,7 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing PATCH operation at {url}")
-        return self.execute("PATCH", url, data=data)
+        return self.execute("PATCH", url, data=data).json()
 
     def delete(self, url: str) -> ResponseType:
         """Delete records at the specified URL, DELETE request.
@@ -184,7 +203,7 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing DELETE operation at {url}")
-        return self.execute("DELETE", url)
+        return self.execute("DELETE", url).json()
 
     def rpc(self, url: str, params: Optional[Dict[str, Any]] = None) -> ResponseType:
         """Perform a POST request at the specified URL.
@@ -197,4 +216,4 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing RPC operation at {url}")
-        return self.execute("POST", url, data=params)
+        return self.execute("POST", url, data=params).json()

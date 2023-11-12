@@ -13,6 +13,5 @@ pytest-mock==3.11.1
 PyYAML==6.0
 requests==2.31.0
 SQLAlchemy==2.0.19
-tenacity==8.2.2
 typing_extensions==4.7.1
 urllib3==2.0.3

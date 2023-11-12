@@ -1,45 +1,24 @@
 import pytest
-from unittest.mock import patch
-from typing import Dict, List, Optional, Any, Union
-from requests.exceptions import HTTPError
+import json
+import requests
+from unittest.mock import patch, create_autospec
 
-import tenacity
 from supacrud import Supabase, SupabaseError
-from supacrud.base import BaseRequester
 
 
-class MockResponse:
-    """Mock class for requests.Response"""
-
-    def __init__(
-        self,
-        json_data: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
-        status_code: int = 200,
-    ):
-        self.json_data = json_data
+class MockResponse(requests.Response):
+    def __init__(self, json_data, status_code):
+        super(MockResponse, self).__init__()
+        self._content = json.dumps(json_data).encode("utf-8")
         self.status_code = status_code
-
-    def json(self):
-        return self.json_data
-
-    def raise_for_status(self):
-        if not 200 <= self.status_code < 300:
-            raise HTTPError(response=self)
+        self.encoding = "utf-8"
 
 
 class MockSession:
-    """Mock class for requests.Session"""
-
-    def __init__(self, response: MockResponse):
+    def __init__(self, response):
         self.response = response
 
-    def request(
-        self,
-        method: str,
-        url: str,
-        headers: Dict[str, str],
-        json: Optional[Dict[str, Any]] = None,
-    ):
+    def request(self, method, url, **kwargs):
         return self.response
 
 
@@ -51,6 +30,13 @@ def supabase():
     return Supabase(base_url, service_role_key, anon_key)
 
 
+def create_mock_response(json_data, status_code=200):
+    mock_response = create_autospec(requests.Response, instance=True)
+    mock_response.json.return_value = json_data
+    mock_response.status_code = status_code
+    return mock_response
+
+
 def test_execute_success(supabase):
     response_data = {"message": "Success"}
     response = MockResponse(json_data=response_data, status_code=200)
@@ -59,7 +45,7 @@ def test_execute_success(supabase):
 
     result = supabase.execute("GET", "/path")
 
-    assert result == response_data
+    assert result.json() == response_data
 
 
 def test_execute_http_error(supabase):
@@ -72,7 +58,7 @@ def test_execute_http_error(supabase):
         supabase.execute("GET", "/path")
 
     assert excinfo.value.status_code == 400
-    assert str(excinfo.value) == "Error"
+    assert "HTTP request failed: " in str(excinfo.value)
 
 
 def test_create(supabase):
@@ -88,13 +74,11 @@ def test_create(supabase):
 
 def test_read(supabase):
     response_data = [{"id": 1, "name": "John"}, {"id": 2, "name": "Jane"}]
-    response = MockResponse(json_data=response_data, status_code=200)
-    session = MockSession(response)
-    supabase.session = session
+    mock_response = create_mock_response(response_data)
 
-    result = supabase.read("/path")
-
-    assert result == response_data
+    with patch("requests.Session.request", return_value=mock_response):
+        result = supabase.read("/path")
+        assert result == response_data
 
 
 def test_update(supabase):
