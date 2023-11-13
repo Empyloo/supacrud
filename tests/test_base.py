@@ -88,7 +88,7 @@ def test_execute_with_retry_enabled(mock_urljoin):
         assert result.json() == expected_result
         mock_urljoin.assert_called_once_with("http://example.com/", "path")
         mock_request.assert_called_once_with(
-            "GET", "http://example.com/path", json=None, headers=headers
+            method="GET", url="http://example.com/path", json=None, headers=headers
         )
         mock_request.return_value.raise_for_status.assert_called_once_with()
 
@@ -135,3 +135,14 @@ def test_execute_handles_http_error(mock_urljoin):
         assert exc_info.value.status_code == 400
         assert "HTTP request failed" in str(exc_info.value)
         mock_urljoin.assert_called_once_with("http://example.com/", "path")
+
+def test_is_json_with_valid_json():
+    assert BaseRequester.is_json('{"key": "value"}') == True
+
+def test_is_json_with_invalid_json():
+    assert BaseRequester.is_json('{key: value}') == False
+
+def test_is_json_with_non_string_input():
+    assert BaseRequester.is_json(123) == False
+    assert BaseRequester.is_json(None) == False
+    assert BaseRequester.is_json(['a', 'b', 'c']) == False

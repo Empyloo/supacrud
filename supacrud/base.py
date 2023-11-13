@@ -1,3 +1,4 @@
+import json
 import requests
 import logging
 from typing import Dict, List, Optional, Any, Union
@@ -85,6 +86,25 @@ class BaseRequester:
 
         self.session = requests.Session()
 
+
+    @staticmethod
+    def is_json(data: Any) -> bool:
+        """
+        Checks whether the given data is a valid JSON string.
+
+        Args:
+            data (Any): The data to check.
+
+        Returns:
+            bool: True if the data is a valid JSON string, False otherwise.
+        """
+        try:
+            json_object = json.loads(data)
+        except (ValueError, TypeError):
+            logger.debug("Data is not a valid JSON string")
+            return False
+        return True
+
     def execute(
         self, method: str, path: str, data: Optional[Dict[str, Any]] = None
     ) -> requests.Response:
@@ -100,7 +120,7 @@ class BaseRequester:
             requests.Response: The response from the HTTP request.
         """
         url = urljoin(self.base_url, path)
-
+        data = json.dumps(data) if data and not self.is_json(data) else data
         if self.retry_enabled:
 
             @retry(
@@ -108,7 +128,7 @@ class BaseRequester:
             )
             def request_with_retry() -> requests.Response:
                 response = self.session.request(
-                    method, url, data=data, headers=self.headers
+                    method=method, url=url, json=data, headers=self.headers
                 )
                 response.raise_for_status()
                 return response
