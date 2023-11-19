@@ -58,7 +58,7 @@ def test_execute_http_error(supabase):
         supabase.execute("GET", "/path")
 
     assert excinfo.value.status_code == 400
-    assert "HTTP request failed: " in str(excinfo.value)
+    assert response_data["message"] in str(excinfo.value)
 
 
 def test_create(supabase):

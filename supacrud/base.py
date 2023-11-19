@@ -1,10 +1,10 @@
-import json
 import requests
 import logging
 from typing import Dict, List, Optional, Any, Union
 from urllib.parse import urljoin
 
-from supacrud.retry import retry
+from supacrud.retry import create_retry_session
+from supacrud.retry_on_status_const import RETRY_ON_STATUS
 
 ResponseType = Union[Dict[str, Any], List[Dict[str, Any]]]
 
@@ -26,6 +26,7 @@ class SupabaseError(Exception):
             url (Optional[str], optional): The URL to be associated with the instance. Defaults to None.
         """
         super().__init__(message)
+        self.message = message
         self.status_code = status_code
         self.url = url
 
@@ -34,21 +35,19 @@ class BaseRequester:
     def __init__(
         self,
         base_url: str,
-        headers: Dict[str, str],
-        retry: bool = True,
+        api_key: str,
+        token: str,
         max_retries: int = 3,
         backoff_factor: float = 2.0,
-        override_non_retriable_status_codes: bool = False,
-        add_non_retriable_status_codes: Optional[List[int]] = None,
-        default_non_retriable_status_codes: List[int] = [
-            401,
-            403,
-            404,
-            405,
-            406,
-            409,
-            410,
-            422,
+        retry_on_status: List[int] = RETRY_ON_STATUS,
+        retry_methods: List[str] = [
+            "HEAD",
+            "GET",
+            "OPTIONS",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
         ],
     ):
         """
@@ -58,105 +57,48 @@ class BaseRequester:
             base_url (str): The base URL for the API.
             headers (Dict[str, str]): Headers to include in the API request.
                 To override the default headers, use the update_headers method.
-            retry (bool, optional): Whether to retry the request if it fails. Defaults to True.
             max_retries (int, optional): Maximum number of retries for the request. Defaults to 3.
             backoff_factor (float, optional): The factor to use for backoff between retries. Defaults to 2.0.
-            override_non_retriable_status_codes (bool, optional): Whether to
-                override the default non-retriable status codes. Defaults to False.
-            add_non_retriable_status_codes (Optional[List[int]], optional): Additional
-                status codes to consider as non-retriable. Defaults to None.
-            default_non_retriable_status_codes (List[int], optional): Default
-                status codes to consider as non-retriable. Defaults to [401, 403, 404, 405, 406, 409, 410, 422].
+            retry_on_status (List[int], optional): List of status codes to retry on. Defaults to [429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526].
+            retry_methods (List[str], optional): List of HTTP methods to retry. Defaults to ["HEAD", "GET", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"].
+
         """
         self.base_url = base_url if base_url.endswith("/") else base_url + "/"
-        self.headers = headers
-        self.retry_enabled = retry
         self.max_retries = max_retries
         self.backoff_factor = backoff_factor
 
-        if override_non_retriable_status_codes:
-            self.non_retriable_status_codes = add_non_retriable_status_codes or []
-        else:
-            self.non_retriable_status_codes = list(
-                set(
-                    default_non_retriable_status_codes
-                    + (add_non_retriable_status_codes or [])
-                )
-            )
-
-        self.session = requests.Session()
-
-
-    @staticmethod
-    def is_json(data: Any) -> bool:
-        """
-        Checks whether the given data is a valid JSON string.
-
-        Args:
-            data (Any): The data to check.
-
-        Returns:
-            bool: True if the data is a valid JSON string, False otherwise.
-        """
-        try:
-            json_object = json.loads(data)
-        except (ValueError, TypeError):
-            logger.debug("Data is not a valid JSON string")
-            return False
-        return True
+        self.session = create_retry_session(
+            api_key=api_key,
+            token=token,
+            total_retries=self.max_retries,
+            retry_on_status=retry_on_status,
+            retry_methods=retry_methods,
+            backoff_factor=self.backoff_factor,
+        )
 
     def execute(
         self, method: str, path: str, data: Optional[Dict[str, Any]] = None
     ) -> requests.Response:
-        """
-        Executes an HTTP request with the given method, path, and data.
-
-        Args:
-            method (str): The HTTP method to use for the request.
-            path (str): The path to send the request to.
-            data (Optional[Dict[str, Any]], optional): The data to send with the request. Defaults to None.
-
-        Returns:
-            requests.Response: The response from the HTTP request.
-        """
         url = urljoin(self.base_url, path)
-        data = json.dumps(data) if data and not self.is_json(data) else data
-        if self.retry_enabled:
-
-            @retry(
-                self.max_retries, self.backoff_factor, self.non_retriable_status_codes
+        try:
+            logger.debug(f"Sending {method} request to {url}")
+            response = self.session.request(method=method, url=url, json=data)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            logger.debug(f"Received status code {e.response.status_code} from {url}")
+            message = e.response.text
+            raise SupabaseError(
+                message=message,
+                status_code=e.response.status_code,
+                url=url,
             )
-            def request_with_retry() -> requests.Response:
-                response = self.session.request(
-                    method=method, url=url, json=data, headers=self.headers
-                )
-                response.raise_for_status()
-                return response
-
-            try:
-                return request_with_retry()
-            except requests.exceptions.HTTPError as e:
-                raise SupabaseError(
-                    "HTTP request failed: %s for method %s headers %s and data %s"
-                    % (e, method, self.headers, data),
-                    status_code=e.response.status_code,
-                    url=url,
-                )
-        else:
-            try:
-                response = self.session.request(
-                    method, url, json=data, headers=self.headers
-                )
-                response.raise_for_status()
-                return response
-            except requests.exceptions.HTTPError as e:
-                raise SupabaseError(
-                    "HTTP request failed: %s for method %s headers %s and data %s"
-                    % (e, method, self.headers, data),
-                    status_code=e.response.status_code,
-                    url=url,
-                )
-
+        except requests.exceptions.ConnectionError as e:
+            raise SupabaseError(message=str(e), url=url)
+        except requests.exceptions.Timeout as e:
+            raise SupabaseError(message=str(e), url=url)
+        except requests.exceptions.RequestException as e:
+            raise SupabaseError(message=str(e), url=url)
+        return response
 
 
 class Supabase(BaseRequester):
@@ -166,6 +108,7 @@ class Supabase(BaseRequester):
         base_url (str): The base URL of the Supabase API.
         service_role_key (str): The service role key for the Supabase API.
         anon_key (str): The anonymous key for the Supabase API.
+
 
     Methods:
         create: Create a record at the specified URL, POST request.
@@ -193,20 +136,17 @@ class Supabase(BaseRequester):
         base_url: str,
         service_role_key: str,
         anon_key: str,
-        retry: bool = True,
         max_retries: int = 3,
         backoff_factor: float = 2.0,
-        override_non_retriable_status_codes: bool = False,
-        add_non_retriable_status_codes: Optional[List[int]] = None,
-        default_non_retriable_status_codes: List[int] = [
-            401,
-            403,
-            404,
-            405,
-            406,
-            409,
-            410,
-            422,
+        retry_on_status: List[int] = RETRY_ON_STATUS,
+        retry_methods: List[str] = [
+            "HEAD",
+            "GET",
+            "OPTIONS",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
         ],
     ):
         """Initialize the client with the base URL, service role key, and anon key.
@@ -215,37 +155,23 @@ class Supabase(BaseRequester):
             base_url (str): The base URL of the Supabase API.
             service_role_key (str): The service role key for the Supabase API.
             anon_key (str): The anonymous key for the Supabase API.
-            retry (bool, optional): Whether to retry the request if it fails. Defaults to True.
             max_retries (int, optional): Maximum number of retries for the request. Defaults to 3.
             backoff_factor (float, optional): The factor to use for backoff between retries. Defaults to 2.0.
-            override_non_retriable_status_codes (bool, optional): Whether to override the default non-retriable status codes. Defaults to False.
-            add_non_retriable_status_codes (Optional[List[int]], optional): Additional status codes to consider as non-retriable. Defaults to None.
-            default_non_retriable_status_codes (List[int], optional): Default status codes to consider as non-retriable. Defaults to [401, 403, 404, 405, 406, 409, 410, 422].
+            retry_on_status (List[int], optional): List of status codes to retry on. Defaults to [429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526].
+                You can override this or add to it by importing the RETRY_ON_STATUS constant, modifying it and passing it to the Supabase constructor.
+            retry_methods (List[str], optional): List of HTTP methods to retry. Defaults to ["HEAD", "GET", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"].
+
         """
-        headers = {
-            "apikey": anon_key,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation",
-            "Authorization": f"Bearer {service_role_key}",
-        }
+
         super().__init__(
             base_url=base_url,
-            headers=headers,
-            retry=retry,
+            api_key=anon_key,
+            token=service_role_key,
             max_retries=max_retries,
             backoff_factor=backoff_factor,
-            override_non_retriable_status_codes=override_non_retriable_status_codes,
-            add_non_retriable_status_codes=add_non_retriable_status_codes,
-            default_non_retriable_status_codes=default_non_retriable_status_codes,
+            retry_on_status=retry_on_status,
+            retry_methods=retry_methods,
         )
-
-    def update_headers(self, headers: Dict[str, str]):
-        """Update the headers used for requests, UPDATE request.
-
-        Args:
-            headers (Dict[str, str]): The new headers to add or existing headers to update.
-        """
-        self.headers.update(headers)
 
     def create(self, url: str, data: Dict[str, Any]) -> ResponseType:
         """Create a record at the specified URL, POST request.

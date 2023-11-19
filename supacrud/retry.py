@@ -1,40 +1,81 @@
+import logging
 import requests
-from typing import Dict, Any, Callable, List
-import functools
-import time
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from typing import List
 
-ResponseType = Dict[str, Any]
+from supacrud.retry_on_status_const import RETRY_ON_STATUS
+
+logger = logging.getLogger(__name__)
 
 
-def retry(
-    max_retries: int, backoff_factor: float, non_retriable_status_codes: List[int]
-):
-    def decorator_retry(func: Callable[..., Any]):
-        @functools.wraps(func)
-        def wrapper_retry(*args: Any, **kwargs: Any) -> Any:
-            attempts = 0
-            while attempts < max_retries:
-                try:
-                    response = func(*args, **kwargs)
-                    if isinstance(response, requests.Response):
-                        if response.status_code not in non_retriable_status_codes:
-                            return response
-                    else:
-                        if (
-                            response.get("status_code")
-                            not in non_retriable_status_codes
-                        ):
-                            return response
-                except requests.exceptions.RequestException as e:
-                    if (
-                        not isinstance(e.response, requests.Response)
-                        or e.response.status_code in non_retriable_status_codes
-                    ):
-                        raise
-                attempts += 1
-                time.sleep(backoff_factor**attempts)
-            return func(*args, **kwargs)
+def create_retry_session(
+    api_key: str,
+    token: str,
+    total_retries: int = 3,
+    retry_on_status: List[int] = None,
+    retry_methods: List[str] = None,
+    backoff_factor: (int, float) = 1,
+) -> requests.Session:
+    """
+    Create a requests session with a retry strategy.
 
-        return wrapper_retry
+    Args:
+        api_key (str): The API key to be used for authentication.
+        token (str): The token to be used for authentication.
+        total_retries (int): Total number of retries. 0 means no retries.
+        retry_on_status (List[int]): List of status codes to retry on.
+        retry_methods (List[str]): List of HTTP methods to retry.
+        backoff_factor (int, float): Backoff factor for retries.
 
-    return decorator_retry
+    Returns:
+        requests.Session: A requests session with a configured retry strategy.
+    """
+    if retry_on_status is None:
+        retry_on_status = RETRY_ON_STATUS
+    if retry_methods is None:
+        retry_methods = [
+            "HEAD",
+            "GET",
+            "OPTIONS",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+        ]
+
+    if not isinstance(api_key, str):
+        raise TypeError("api_key must be a string")
+    if not isinstance(token, str):
+        raise TypeError("token must be a string")
+    if not isinstance(total_retries, int):
+        raise TypeError("total_retries must be an integer")
+    if not isinstance(retry_on_status, list) or not all(
+        isinstance(status, int) for status in retry_on_status
+    ):
+        raise TypeError("retry_on_status must be a list of integers")
+    if not isinstance(retry_methods, list) or not all(
+        isinstance(method, str) for method in retry_methods
+    ):
+        raise TypeError("retry_methods must be a list of strings")
+    if not isinstance(backoff_factor, (int, float)):
+        raise TypeError("backoff_factor must be an integer or float")
+
+    try:
+        retry_strategy = Retry(
+            total=total_retries,
+            status_forcelist=retry_on_status,
+            allowed_methods=retry_methods,
+            backoff_factor=backoff_factor,
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session = requests.Session()
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        session.headers["apikey"] = api_key
+        session.headers["Authorization"] = f"Bearer {token}"
+    except Exception as e:
+        logger.error("Error creating retry session", exc_info=True)
+        raise e
+    return session
