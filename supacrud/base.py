@@ -173,7 +173,7 @@ class Supabase(BaseRequester):
             retry_methods=retry_methods,
         )
 
-    def create(self, url: str, data: Dict[str, Any]) -> ResponseType:
+    def create(self, url: str, data: Dict[str, Any]) -> requests.Response:
         """Create a record at the specified URL, POST request.
 
         Args:
@@ -184,9 +184,9 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing POST operation at {url}")
-        return self.execute("POST", url, data=data).json()
+        return self.execute("POST", url, data=data)
 
-    def read(self, url: str) -> ResponseType:
+    def read(self, url: str) -> requests.Response:
         """Read records from the specified URL, GET request.
 
         Args:
@@ -196,9 +196,9 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing GET operation at {url}")
-        return self.execute("GET", url).json()
+        return self.execute("GET", url)
 
-    def update(self, url: str, data: Dict[str, Any]) -> ResponseType:
+    def update(self, url: str, data: Dict[str, Any]) -> requests.Response:
         """Update records at the specified URL, PATCH request.
 
         Args:
@@ -209,9 +209,9 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing PATCH operation at {url}")
-        return self.execute("PATCH", url, data=data).json()
+        return self.execute("PATCH", url, data=data)
 
-    def delete(self, url: str) -> ResponseType:
+    def delete(self, url: str) -> requests.Response:
         """Delete records at the specified URL, DELETE request.
 
         Args:
@@ -221,9 +221,9 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing DELETE operation at {url}")
-        return self.execute("DELETE", url).json()
+        return self.execute("DELETE", url)
 
-    def rpc(self, url: str, params: Optional[Dict[str, Any]] = None) -> ResponseType:
+    def rpc(self, url: str, params: Optional[Dict[str, Any]] = None) -> requests.Response:
         """Perform a POST request at the specified URL.
 
         Args:
@@ -234,4 +234,4 @@ class Supabase(BaseRequester):
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing RPC operation at {url}")
-        return self.execute("POST", url, data=params).json()
+        return self.execute("POST", url, data=params)

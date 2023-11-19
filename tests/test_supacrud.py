@@ -69,7 +69,7 @@ def test_create(supabase):
 
     result = supabase.create("/path", {"key": "value"})
 
-    assert result == response_data
+    assert result == response
 
 
 def test_read(supabase):
@@ -78,7 +78,7 @@ def test_read(supabase):
 
     with patch("requests.Session.request", return_value=mock_response):
         result = supabase.read("/path")
-        assert result == response_data
+        assert result == mock_response
 
 
 def test_update(supabase):
@@ -89,7 +89,7 @@ def test_update(supabase):
 
     result = supabase.update("/path", {"id": 1, "name": "John Doe"})
 
-    assert result == response_data
+    assert result == response
 
 
 def test_delete(supabase):
@@ -100,7 +100,7 @@ def test_delete(supabase):
 
     result = supabase.delete("/path")
 
-    assert result == response_data
+    assert result == response
 
 
 def test_rpc(supabase):
@@ -111,4 +111,4 @@ def test_rpc(supabase):
 
     result = supabase.rpc("/path", {"param": "value"})
 
-    assert result == response_data
+    assert result == response
