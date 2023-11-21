@@ -5,7 +5,7 @@ from unittest.mock import (
     MagicMock,
 )
 import requests
-
+from requests_mock.mocker import Mocker
 from requests.exceptions import HTTPError
 import urllib3
 import json
@@ -134,3 +134,25 @@ def test_retry_mechanism(mock_get_conn, mock_responses):
     )
     response = requester.execute("GET", "/unavailable-endpoint")
     assert mock_get_conn.call_count == 3
+
+
+def test_headers():
+    base_url = "http://example.com"
+    api_key = "key"
+    token = "test_token"
+    requester = BaseRequester(base_url, api_key, token)
+
+    with Mocker() as m:
+        m.get(
+            "http://example.com/unavailable-endpoint",
+            headers={
+                "Prefer": "return=representation",
+                "apikey": api_key,
+                "Authorization": f"Bearer {token}",
+            },
+        )
+        requester.execute("GET", "/unavailable-endpoint", full_representation=True)
+
+    assert "return=representation" == m.last_request.headers["Prefer"]
+    assert api_key == m.last_request.headers["apikey"]
+    assert f"Bearer {token}" == m.last_request.headers["Authorization"]

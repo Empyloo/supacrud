@@ -77,12 +77,19 @@ class BaseRequester:
         )
 
     def execute(
-        self, method: str, path: str, data: Optional[Dict[str, Any]] = None
+        self,
+        method: str,
+        path: str,
+        data: Optional[Dict[str, Any]] = None,
+        full_representation: bool = False,
     ) -> requests.Response:
         url = urljoin(self.base_url, path)
+        headers = {"Prefer": "return=representation" if full_representation else ""}
         try:
             logger.debug(f"Sending {method} request to {url}")
-            response = self.session.request(method=method, url=url, json=data)
+            response = self.session.request(
+                method=method, url=url, headers=headers, json=data
+            )
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
             logger.debug(f"Received status code {e.response.status_code} from {url}")
@@ -173,65 +180,85 @@ class Supabase(BaseRequester):
             retry_methods=retry_methods,
         )
 
-    def create(self, url: str, data: Dict[str, Any]) -> requests.Response:
+    def create(
+        self, url: str, data: Dict[str, Any], full_representation: bool = False
+    ) -> requests.Response:
         """Create a record at the specified URL, POST request.
 
         Args:
             url (str): The URL to create the record at.
             data (Dict[str, Any]): The data to create the record with.
+            full_representation (bool, optional): Whether to return the full representation of the resource. Defaults to False.
 
         Returns:
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing POST operation at {url}")
-        return self.execute("POST", url, data=data)
+        return self.execute(
+            "POST", url, data=data, full_representation=full_representation
+        )
 
-    def read(self, url: str) -> requests.Response:
+    def read(self, url: str, full_representation: bool = False) -> requests.Response:
         """Read records from the specified URL, GET request.
 
         Args:
             url (str): The URL to read records from.
+            full_representation (bool, optional): Whether to return the full representation of the resource. Defaults to False.
 
         Returns:
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing GET operation at {url}")
-        return self.execute("GET", url)
+        return self.execute("GET", url, full_representation=full_representation)
 
-    def update(self, url: str, data: Dict[str, Any]) -> requests.Response:
+    def update(
+        self, url: str, data: Dict[str, Any], full_representation: bool = False
+    ) -> requests.Response:
         """Update records at the specified URL, PATCH request.
 
         Args:
             url (str): The URL to update records at.
             data (Dict[str, Any]): The data to update the records with.
+            full_representation (bool, optional): Whether to return the full representation of the resource. Defaults to False.
 
         Returns:
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing PATCH operation at {url}")
-        return self.execute("PATCH", url, data=data)
+        return self.execute(
+            "PATCH", url, data=data, full_representation=full_representation
+        )
 
-    def delete(self, url: str) -> requests.Response:
+    def delete(self, url: str, full_representation: bool = False) -> requests.Response:
         """Delete records at the specified URL, DELETE request.
 
         Args:
             url (str): The URL to delete records at.
+            full_representation (bool, optional): Whether to return the full representation of the resource. Defaults to False.
 
         Returns:
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing DELETE operation at {url}")
-        return self.execute("DELETE", url)
+        return self.execute("DELETE", url, full_representation=full_representation)
 
-    def rpc(self, url: str, params: Optional[Dict[str, Any]] = None) -> requests.Response:
+    def rpc(
+        self,
+        url: str,
+        params: Optional[Dict[str, Any]] = None,
+        full_representation: bool = False,
+    ) -> requests.Response:
         """Perform a POST request at the specified URL.
 
         Args:
             url (str): The URL to perform the POST request at.
             params (Optional[Dict[str, Any]], optional): The parameters to send with the request. Defaults to None.
+            full_representation (bool, optional): Whether to return the full representation of the resource. Defaults to False.
 
         Returns:
             ResponseType: The response from the Supabase API.
         """
         logger.debug(f"Performing RPC operation at {url}")
-        return self.execute("POST", url, data=params)
+        return self.execute(
+            "POST", url, data=params, full_representation=full_representation
+        )
